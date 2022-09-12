@@ -1,31 +1,33 @@
 {
   "schemaVersion": 1,
-  "id": "modid",
+  "id": "sandbox_mobs",
   "version": "${version}",
 
-  "name": "Example Mod",
-  "description": "This is an example description! Tell everyone what your mod is about!",
+  "name": "Sandbox Mobs",
+  "description": "Custom Mobs for Sandbox Atlas Zones",
   "authors": [
-    "Me!"
+    "Me! A Mario"
   ],
   "contact": {
     "homepage": "https://fabricmc.net/",
-    "sources": "https://github.com/FabricMC/fabric-example-mod"
+    "sources": "https://github.com/product17/sandbox-mobs"
   },
 
   "license": "CC0-1.0",
-  "icon": "assets/modid/icon.png",
+  "icon": "assets/sandbox_mobs/icon.png",
 
   "environment": "*",
   "entrypoints": {
     "main": [
-      "net.fabricmc.example.ExampleMod"
+      "io.sandbox.sandbox_mobs.Main"
+    ],
+    "client": [
+      "io.sandbox.sandbox_mobs.MainClient"
     ]
   },
   "mixins": [
-    "modid.mixins.json"
+    "sandbox_mobs.mixins.json"
   ],
-
   "depends": {
     "fabricloader": ">=0.14.9",
     "fabric-api": "*",
