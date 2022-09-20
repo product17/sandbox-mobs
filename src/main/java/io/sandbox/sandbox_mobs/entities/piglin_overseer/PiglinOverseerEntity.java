@@ -10,6 +10,7 @@ import io.sandbox.sandbox_mobs.entities.IAnimationTriggers;
 import net.minecraft.block.BlockState;
 import net.minecraft.entity.EntityData;
 import net.minecraft.entity.EntityType;
+import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.SpawnReason;
 import net.minecraft.entity.ai.brain.Brain;
@@ -19,9 +20,14 @@ import net.minecraft.entity.ai.brain.sensor.SensorType;
 import net.minecraft.entity.attribute.DefaultAttributeContainer;
 import net.minecraft.entity.attribute.EntityAttributes;
 import net.minecraft.entity.damage.DamageSource;
+import net.minecraft.entity.data.DataTracker;
+import net.minecraft.entity.data.TrackedData;
+import net.minecraft.entity.data.TrackedDataHandlerRegistry;
 import net.minecraft.entity.mob.AbstractPiglinEntity;
 import net.minecraft.entity.mob.HostileEntity;
 import net.minecraft.entity.mob.PiglinActivity;
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundEvent;
@@ -40,8 +46,17 @@ import software.bernie.geckolib3.core.manager.AnimationFactory;
 
 public class PiglinOverseerEntity extends AbstractPiglinEntity implements IAnimatable, IAnimationTriggers {
   private AnimationFactory factory = new AnimationFactory(this);
-  public int mainAttackStartAnimation = 10;
-  public int mainAttackTicksUntilDamage = 11;
+  private static final TrackedData<Integer> MAIN_ATTACK_PROGRESS = DataTracker.registerData(
+    PiglinOverseerEntity.class,
+		TrackedDataHandlerRegistry.INTEGER
+  );
+  private static final TrackedData<Boolean> MAIN_ATTACK_HAS_SWUNG = DataTracker.registerData(
+    PiglinOverseerEntity.class,
+		TrackedDataHandlerRegistry.BOOLEAN
+  );
+  public int mainAttackFullAnimation = 20;
+  public int mainAttackTicksUntilDamage = 10;
+
   protected static final ImmutableList<SensorType<? extends Sensor<? super PiglinOverseerEntity>>> SENSOR_TYPES = ImmutableList.of(
     SensorType.NEAREST_LIVING_ENTITIES,
     SensorType.NEAREST_PLAYERS,
@@ -79,12 +94,20 @@ public class PiglinOverseerEntity extends AbstractPiglinEntity implements IAnima
 
   public static DefaultAttributeContainer.Builder createPiglinOverseerAttributes() {
     return HostileEntity.createHostileAttributes()
-        .add(EntityAttributes.GENERIC_ATTACK_DAMAGE, 10.0)
+        .add(EntityAttributes.GENERIC_ATTACK_DAMAGE, 1.0)
         .add(EntityAttributes.GENERIC_ATTACK_KNOCKBACK, 1)
-        .add(EntityAttributes.GENERIC_ATTACK_SPEED, 0.01)
+        .add(EntityAttributes.GENERIC_ATTACK_SPEED, 0.8)
         .add(EntityAttributes.GENERIC_KNOCKBACK_RESISTANCE, 0.9)
         .add(EntityAttributes.GENERIC_MAX_HEALTH, 150.0)
         .add(EntityAttributes.GENERIC_MOVEMENT_SPEED, 0.25f);
+  }
+
+  @Override
+  protected void initDataTracker() {
+    super.initDataTracker();
+    // initialize to animation at it's finished state
+    this.dataTracker.startTracking(MAIN_ATTACK_PROGRESS, mainAttackFullAnimation + 1);
+    this.dataTracker.startTracking(MAIN_ATTACK_HAS_SWUNG, true);
   }
 
   @Override
@@ -92,8 +115,10 @@ public class PiglinOverseerEntity extends AbstractPiglinEntity implements IAnima
   public EntityData initialize(ServerWorldAccess world, LocalDifficulty difficulty, SpawnReason spawnReason, @Nullable EntityData entityData, @Nullable NbtCompound entityNbt) {
       PiglinOverseerBrain.setCurrentPosAsHome(this);
       this.initEquipment(world.getRandom(), difficulty);
+      this.equipStack(EquipmentSlot.MAINHAND, new ItemStack(Items.GOLDEN_AXE));
       return super.initialize(world, difficulty, spawnReason, entityData, entityNbt);
   }
+  
 
   @Override
   protected Brain.Profile<PiglinOverseerEntity> createBrainProfile() {
@@ -111,12 +136,34 @@ public class PiglinOverseerEntity extends AbstractPiglinEntity implements IAnima
 
   @Override
   protected void mobTick() {
+    super.mobTick();
     this.world.getProfiler().push("piglinOverseerBrain");
     this.getBrain().tick((ServerWorld)this.world, this);
     this.world.getProfiler().pop();
     PiglinOverseerBrain.tick(this);
     PiglinOverseerBrain.playSoundRandomly(this);
-    super.mobTick();
+
+    // Main Attack Animation progress
+    int mainAttackProgress = this.getMainAttackProgress();
+    if (mainAttackProgress < mainAttackFullAnimation) {
+      mainAttackProgress++;
+      this.setMainAttackProgress(mainAttackProgress);
+
+      System.out.println("Attack!! " + mainAttackProgress);
+
+      if (mainAttackProgress >= this.mainAttackTicksUntilDamage && !this.getMainAttackHasSwung()) {
+        var optMemory = this.getBrain().getOptionalMemory(MemoryModuleType.ATTACK_TARGET);
+        if (optMemory.isPresent()) {
+          LivingEntity target = optMemory.get();
+          System.out.println("Attack!! " + (target != null));
+          if (target != null && this.isInAttackRange(target)) {
+            System.out.println("In Range");
+            this.tryAttack(target);
+            this.setMainAttackHasSwung(true);
+          }
+        }
+      }
+    }
   }
 
   @Override
@@ -138,13 +185,17 @@ public class PiglinOverseerEntity extends AbstractPiglinEntity implements IAnima
     return false;
   }
 
-  private <E extends IAnimatable> PlayState predicate(AnimationEvent<E> event) {
-    if (this.mainAttackTicksUntilDamage < 11) {
-      event.getController()
-        .setAnimation(new AnimationBuilder().addAnimation("animation.piglin_overseer.attack", false));
+  private <E extends IAnimatable> PlayState attackPredicate(AnimationEvent<E> event) {  
+    if (this.getMainAttackProgress() < this.mainAttackFullAnimation) {
+      event.getController().setAnimation(
+        new AnimationBuilder().addAnimation("animation.piglin_overseer.attack", true));
       return PlayState.CONTINUE;
     }
 
+    return PlayState.STOP;
+  }
+
+  private <E extends IAnimatable> PlayState predicate(AnimationEvent<E> event) {
     if (event.isMoving()) {
       event.getController().setAnimation(new AnimationBuilder().addAnimation("animation.piglin_overseer.walk", true));
       return PlayState.CONTINUE;
@@ -156,23 +207,33 @@ public class PiglinOverseerEntity extends AbstractPiglinEntity implements IAnima
 
   @Override
   public void registerControllers(AnimationData animationData) {
-    animationData
-      .addAnimationController(new AnimationController<PiglinOverseerEntity>(this, "controller", 0, this::predicate));
+    animationData.addAnimationController(
+      new AnimationController<PiglinOverseerEntity>(
+        this, "controller", 0, this::predicate));
+    animationData.addAnimationController(
+      new AnimationController<PiglinOverseerEntity>(
+        this, "attackController", 0, this::attackPredicate));
+  }
+
+  public int getMainAttackProgress () {
+    return this.dataTracker.get(MAIN_ATTACK_PROGRESS);
+  }
+
+  public void setMainAttackProgress (int tick) {
+    this.dataTracker.set(MAIN_ATTACK_PROGRESS, tick);
+  }
+
+  public boolean getMainAttackHasSwung () {
+    return this.dataTracker.get(MAIN_ATTACK_HAS_SWUNG);
+  }
+
+  public void setMainAttackHasSwung (Boolean swung) {
+    this.dataTracker.set(MAIN_ATTACK_HAS_SWUNG, swung);
   }
 
   @Override
   public AnimationFactory getFactory() {
     return factory;
-  }
-
-  @Override
-  public int getMainAttackStartAnimationTicks() {
-    return this.mainAttackStartAnimation;
-  }
-
-  @Override
-  public void setMainAttackTicksUntilDamage(int ticks) {
-    this.mainAttackTicksUntilDamage = ticks;
   }
 
   @Override
@@ -215,11 +276,5 @@ public class PiglinOverseerEntity extends AbstractPiglinEntity implements IAnima
   @Override
   protected void playZombificationSound() {
     this.playSound(SoundEvents.ENTITY_PIGLIN_BRUTE_CONVERTED_TO_ZOMBIFIED, 1.0f, this.getSoundPitch());
-  }
-
-  @Override
-  public void mainAttackStarted() {
-    // TODO Auto-generated method stub
-    
   }
 }

@@ -2,11 +2,13 @@ package io.sandbox.sandbox_mobs.tasks;
 
 import com.google.common.collect.ImmutableMap;
 
+import io.sandbox.sandbox_mobs.entities.IAnimationTriggers;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.ai.brain.MemoryModuleState;
 import net.minecraft.entity.ai.brain.MemoryModuleType;
 import net.minecraft.entity.ai.brain.task.LookTargetUtil;
 import net.minecraft.entity.ai.brain.task.Task;
+import net.minecraft.entity.attribute.EntityAttributes;
 import net.minecraft.entity.mob.MobEntity;
 import net.minecraft.item.Item;
 import net.minecraft.item.RangedWeaponItem;
@@ -37,12 +39,26 @@ extends Task<MobEntity> {
 
     @Override
     protected void run(ServerWorld serverWorld, MobEntity mobEntity, long l) {
-      System.out.println("HIT THE TASK");
         LivingEntity livingEntity = this.getAttackTarget(mobEntity);
         LookTargetUtil.lookAt(mobEntity, livingEntity);
         mobEntity.swingHand(Hand.MAIN_HAND);
-        mobEntity.tryAttack(livingEntity);
-        mobEntity.getBrain().remember(MemoryModuleType.ATTACK_COOLING_DOWN, true, this.interval);
+
+        // get the Entity's startAnimation wait until dealing damage
+        // int mainAttackStartAnimationTicks = ((IAnimationTriggers)mobEntity).getMainAttackProgress();
+
+        // Start the timer until damage
+        ((IAnimationTriggers)mobEntity).setMainAttackProgress(0);
+        ((IAnimationTriggers)mobEntity).setMainAttackHasSwung(false);
+
+        System.out.println("Speed: " + mobEntity.getAttributeValue(EntityAttributes.GENERIC_ATTACK_SPEED));
+        // System.out.println("Attack Speed: " + ((int)(20 / mobEntity.getAttributeValue(EntityAttributes.GENERIC_ATTACK_SPEED)) + mainAttackStartAnimationTicks));
+
+        // Trigger the Cooldown
+        mobEntity.getBrain().remember(
+            MemoryModuleType.ATTACK_COOLING_DOWN,
+            true,
+            interval
+        );
     }
 
     private LivingEntity getAttackTarget(MobEntity entity) {

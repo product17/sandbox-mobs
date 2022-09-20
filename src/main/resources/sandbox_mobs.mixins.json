@@ -4,8 +4,6 @@
   "package": "io.sandbox.sandbox_mobs.mixin",
   "compatibilityLevel": "JAVA_17",
   "mixins": [
-    "AttackGoalMixin",
-    "MeleeAttackTaskMixin"
   ],
   "client": [],
   "injectors": {

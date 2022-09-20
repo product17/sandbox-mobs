@@ -72,7 +72,7 @@ public class PiglinOverseerBrain {
         (ImmutableList<? extends Task<? super PiglinOverseerEntity>>) ImmutableList.of(
             new ForgetAttackTargetTask(entity -> !PiglinOverseerBrain.isTarget(piglinBrute, entity)),
             new RangedApproachTask(1.0f),
-            new MainMeleeAttackTask(100)),
+            new MainMeleeAttackTask(40)),
         MemoryModuleType.ATTACK_TARGET);
   }
 
