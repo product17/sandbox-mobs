@@ -13,7 +13,7 @@ import net.minecraft.util.registry.Registry;
 public class EntityLoader {
   public static final EntityType<PiglinOverseerEntity> PIGLIN_OVERSEER = Registry.register(
     Registry.ENTITY_TYPE,
-    new Identifier(Main.MOD_ID, "pigling_overseer"),
+    new Identifier(Main.MOD_ID, "piglin_overseer"),
     FabricEntityTypeBuilder.create(
       SpawnGroup.MONSTER,
       PiglinOverseerEntity::new
