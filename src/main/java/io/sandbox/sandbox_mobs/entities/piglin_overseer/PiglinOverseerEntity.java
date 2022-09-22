@@ -50,12 +50,20 @@ public class PiglinOverseerEntity extends AbstractPiglinEntity implements IAnima
     PiglinOverseerEntity.class,
 		TrackedDataHandlerRegistry.INTEGER
   );
-  private static final TrackedData<Boolean> MAIN_ATTACK_HAS_SWUNG = DataTracker.registerData(
+  private static final TrackedData<Boolean> SPECIAL_ATTACK_ACTIVE = DataTracker.registerData(
     PiglinOverseerEntity.class,
 		TrackedDataHandlerRegistry.BOOLEAN
   );
+  private static final TrackedData<Integer> SPECIAL_ATTACK_PROGRESS = DataTracker.registerData(
+    PiglinOverseerEntity.class,
+		TrackedDataHandlerRegistry.INTEGER
+  );
+  public int mainAttackCooldown = 30;
   public int mainAttackFullAnimation = 20;
+  public boolean getMainAttackHasSwung = false;
   public int mainAttackTicksUntilDamage = 10;
+  public static int specialAttackTotalTicks = 30;
+  public static int specialAttackCooldown = 30 * 20; // 30 seconds
 
   protected static final ImmutableList<SensorType<? extends Sensor<? super PiglinOverseerEntity>>> SENSOR_TYPES = ImmutableList.of(
     SensorType.NEAREST_LIVING_ENTITIES,
@@ -107,7 +115,8 @@ public class PiglinOverseerEntity extends AbstractPiglinEntity implements IAnima
     super.initDataTracker();
     // initialize to animation at it's finished state
     this.dataTracker.startTracking(MAIN_ATTACK_PROGRESS, mainAttackFullAnimation + 1);
-    this.dataTracker.startTracking(MAIN_ATTACK_HAS_SWUNG, true);
+    this.dataTracker.startTracking(SPECIAL_ATTACK_ACTIVE, false);
+    this.dataTracker.startTracking(SPECIAL_ATTACK_PROGRESS, 0);
   }
 
   @Override
@@ -143,26 +152,28 @@ public class PiglinOverseerEntity extends AbstractPiglinEntity implements IAnima
     PiglinOverseerBrain.tick(this);
     PiglinOverseerBrain.playSoundRandomly(this);
 
+    // Increment the SpecialAttack (used to compare against cooldown)
+    this.setSpecialAttackProgress(this.getSpecialAttackProgress() + 1);
+
     // Main Attack Animation progress
     int mainAttackProgress = this.getMainAttackProgress();
-    if (mainAttackProgress < mainAttackFullAnimation) {
-      mainAttackProgress++;
-      this.setMainAttackProgress(mainAttackProgress);
-
-      System.out.println("Attack!! " + mainAttackProgress);
-
-      if (mainAttackProgress >= this.mainAttackTicksUntilDamage && !this.getMainAttackHasSwung()) {
-        var optMemory = this.getBrain().getOptionalMemory(MemoryModuleType.ATTACK_TARGET);
-        if (optMemory.isPresent()) {
-          LivingEntity target = optMemory.get();
-          System.out.println("Attack!! " + (target != null));
-          if (target != null && this.isInAttackRange(target)) {
-            System.out.println("In Range");
-            this.tryAttack(target);
-            this.setMainAttackHasSwung(true);
+    mainAttackProgress++;
+    this.setMainAttackProgress(mainAttackProgress);
+    if (mainAttackProgress < mainAttackCooldown) {
+      if (mainAttackProgress < mainAttackFullAnimation) {
+        if (mainAttackProgress >= this.mainAttackTicksUntilDamage && !this.getMainAttackHasSwung()) {
+          var optMemory = this.getBrain().getOptionalMemory(MemoryModuleType.ATTACK_TARGET);
+          if (optMemory.isPresent()) {
+            LivingEntity target = optMemory.get();
+            if (target != null && this.isInAttackRange(target)) {
+              this.tryAttack(target);
+              this.setMainAttackHasSwung(true);
+            }
           }
         }
       }
+    } else {
+      this.setMainAttackHasSwung(false);
     }
   }
 
@@ -192,6 +203,12 @@ public class PiglinOverseerEntity extends AbstractPiglinEntity implements IAnima
       return PlayState.CONTINUE;
     }
 
+    if (this.getSpecialAttackProgress() < specialAttackTotalTicks) {
+      event.getController().setAnimation(
+        new AnimationBuilder().addAnimation("animation.piglin_overseer.shout", true));
+      return PlayState.CONTINUE;
+    }
+
     return PlayState.STOP;
   }
 
@@ -215,6 +232,10 @@ public class PiglinOverseerEntity extends AbstractPiglinEntity implements IAnima
         this, "attackController", 0, this::attackPredicate));
   }
 
+  public int getMainAttackCooldown() {
+    return mainAttackCooldown;
+  }
+
   public int getMainAttackProgress () {
     return this.dataTracker.get(MAIN_ATTACK_PROGRESS);
   }
@@ -224,11 +245,11 @@ public class PiglinOverseerEntity extends AbstractPiglinEntity implements IAnima
   }
 
   public boolean getMainAttackHasSwung () {
-    return this.dataTracker.get(MAIN_ATTACK_HAS_SWUNG);
+    return this.getMainAttackHasSwung;
   }
 
-  public void setMainAttackHasSwung (Boolean swung) {
-    this.dataTracker.set(MAIN_ATTACK_HAS_SWUNG, swung);
+  public void setMainAttackHasSwung (Boolean hasSwung) {
+    this.getMainAttackHasSwung = hasSwung;
   }
 
   @Override
@@ -276,5 +297,25 @@ public class PiglinOverseerEntity extends AbstractPiglinEntity implements IAnima
   @Override
   protected void playZombificationSound() {
     this.playSound(SoundEvents.ENTITY_PIGLIN_BRUTE_CONVERTED_TO_ZOMBIFIED, 1.0f, this.getSoundPitch());
+  }
+
+  public boolean getSpecialAttackActive() {
+    return this.dataTracker.get(SPECIAL_ATTACK_ACTIVE);
+  }
+
+  public void setSpecialAttackActive(Boolean isActive) {
+    this.dataTracker.set(SPECIAL_ATTACK_ACTIVE, isActive);
+  }
+
+  public int getSpecialAttackCooldown() {
+    return specialAttackCooldown;
+  }
+
+  public int getSpecialAttackProgress() {
+    return this.dataTracker.get(SPECIAL_ATTACK_PROGRESS);
+  }
+
+  public void setSpecialAttackProgress(int tick) {
+    this.dataTracker.set(SPECIAL_ATTACK_PROGRESS, tick);
   }
 }

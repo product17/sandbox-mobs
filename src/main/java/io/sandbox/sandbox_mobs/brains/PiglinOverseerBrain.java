@@ -9,6 +9,7 @@ import com.mojang.datafixers.util.Pair;
 
 import io.sandbox.sandbox_mobs.entities.piglin_overseer.PiglinOverseerEntity;
 import io.sandbox.sandbox_mobs.tasks.MainMeleeAttackTask;
+import io.sandbox.sandbox_mobs.tasks.SpecialAttackTask;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.ai.brain.Activity;
@@ -67,12 +68,13 @@ public class PiglinOverseerBrain {
   }
 
   private static void addFightActivities(PiglinOverseerEntity piglinBrute, Brain<PiglinOverseerEntity> brain) {
-    System.out.println("Added Fight");
     brain.setTaskList(Activity.FIGHT, 10,
         (ImmutableList<? extends Task<? super PiglinOverseerEntity>>) ImmutableList.of(
             new ForgetAttackTargetTask(entity -> !PiglinOverseerBrain.isTarget(piglinBrute, entity)),
             new RangedApproachTask(1.0f),
-            new MainMeleeAttackTask(40)),
+            new MainMeleeAttackTask(40),
+            new SpecialAttackTask(12)
+        ),
         MemoryModuleType.ATTACK_TARGET);
   }
 

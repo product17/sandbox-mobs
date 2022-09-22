@@ -16,24 +16,29 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.Hand;
 
 public class MainMeleeAttackTask
-extends Task<MobEntity> {
+        extends Task<MobEntity> {
     private final int interval;
 
     public MainMeleeAttackTask(int interval) {
-      super(ImmutableMap.of(MemoryModuleType.LOOK_TARGET, MemoryModuleState.REGISTERED, MemoryModuleType.ATTACK_TARGET, MemoryModuleState.VALUE_PRESENT, MemoryModuleType.ATTACK_COOLING_DOWN, MemoryModuleState.VALUE_ABSENT));
-      this.interval = interval;
+        super(ImmutableMap.of(MemoryModuleType.LOOK_TARGET, MemoryModuleState.REGISTERED,
+                MemoryModuleType.ATTACK_TARGET, MemoryModuleState.VALUE_PRESENT, MemoryModuleType.ATTACK_COOLING_DOWN,
+                MemoryModuleState.VALUE_ABSENT));
+        this.interval = interval;
     }
 
     @Override
     protected boolean shouldRun(ServerWorld serverWorld, MobEntity mobEntity) {
         LivingEntity livingEntity = this.getAttackTarget(mobEntity);
-        return !this.isHoldingUsableRangedWeapon(mobEntity) && LookTargetUtil.isVisibleInMemory(mobEntity, livingEntity) && mobEntity.isInAttackRange(livingEntity);
+        return !this.isHoldingUsableRangedWeapon(mobEntity) &&
+            LookTargetUtil.isVisibleInMemory(mobEntity, livingEntity) &&
+            ((IAnimationTriggers) mobEntity).getMainAttackProgress() > ((IAnimationTriggers) mobEntity).getMainAttackCooldown() && 
+            mobEntity.isInAttackRange(livingEntity);
     }
 
     private boolean isHoldingUsableRangedWeapon(MobEntity entity) {
         return entity.isHolding(stack -> {
             Item item = stack.getItem();
-            return item instanceof RangedWeaponItem && entity.canUseRangedWeapon((RangedWeaponItem)item);
+            return item instanceof RangedWeaponItem && entity.canUseRangedWeapon((RangedWeaponItem) item);
         });
     }
 
@@ -44,21 +49,23 @@ extends Task<MobEntity> {
         mobEntity.swingHand(Hand.MAIN_HAND);
 
         // get the Entity's startAnimation wait until dealing damage
-        // int mainAttackStartAnimationTicks = ((IAnimationTriggers)mobEntity).getMainAttackProgress();
+        // int mainAttackStartAnimationTicks =
+        // ((IAnimationTriggers)mobEntity).getMainAttackProgress();
 
         // Start the timer until damage
-        ((IAnimationTriggers)mobEntity).setMainAttackProgress(0);
-        ((IAnimationTriggers)mobEntity).setMainAttackHasSwung(false);
+        ((IAnimationTriggers) mobEntity).setMainAttackProgress(0);
+        ((IAnimationTriggers) mobEntity).setMainAttackHasSwung(false);
 
         System.out.println("Speed: " + mobEntity.getAttributeValue(EntityAttributes.GENERIC_ATTACK_SPEED));
-        // System.out.println("Attack Speed: " + ((int)(20 / mobEntity.getAttributeValue(EntityAttributes.GENERIC_ATTACK_SPEED)) + mainAttackStartAnimationTicks));
+        // System.out.println("Attack Speed: " + ((int)(20 /
+        // mobEntity.getAttributeValue(EntityAttributes.GENERIC_ATTACK_SPEED)) +
+        // mainAttackStartAnimationTicks));
 
         // Trigger the Cooldown
         mobEntity.getBrain().remember(
-            MemoryModuleType.ATTACK_COOLING_DOWN,
-            true,
-            interval
-        );
+                MemoryModuleType.ATTACK_COOLING_DOWN,
+                true,
+                interval);
     }
 
     private LivingEntity getAttackTarget(MobEntity entity) {
