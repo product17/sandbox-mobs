@@ -54,7 +54,6 @@ public class MainMeleeAttackTask
 
         // Start the timer until damage
         ((IAnimationTriggers) mobEntity).setMainAttackProgress(0);
-        ((IAnimationTriggers) mobEntity).setMainAttackHasSwung(false);
 
         System.out.println("Speed: " + mobEntity.getAttributeValue(EntityAttributes.GENERIC_ATTACK_SPEED));
         // System.out.println("Attack Speed: " + ((int)(20 /

@@ -60,7 +60,6 @@ public class PiglinOverseerEntity extends AbstractPiglinEntity implements IAnima
   );
   public int mainAttackCooldown = 30;
   public int mainAttackFullAnimation = 20;
-  public boolean getMainAttackHasSwung = false;
   public int mainAttackTicksUntilDamage = 10;
   public static int specialAttackTotalTicks = 30;
   public static int specialAttackCooldown = 30 * 20; // 30 seconds
@@ -161,19 +160,16 @@ public class PiglinOverseerEntity extends AbstractPiglinEntity implements IAnima
     this.setMainAttackProgress(mainAttackProgress);
     if (mainAttackProgress < mainAttackCooldown) {
       if (mainAttackProgress < mainAttackFullAnimation) {
-        if (mainAttackProgress >= this.mainAttackTicksUntilDamage && !this.getMainAttackHasSwung()) {
+        if (mainAttackProgress == this.mainAttackTicksUntilDamage) {
           var optMemory = this.getBrain().getOptionalMemory(MemoryModuleType.ATTACK_TARGET);
           if (optMemory.isPresent()) {
             LivingEntity target = optMemory.get();
             if (target != null && this.isInAttackRange(target)) {
               this.tryAttack(target);
-              this.setMainAttackHasSwung(true);
             }
           }
         }
       }
-    } else {
-      this.setMainAttackHasSwung(false);
     }
   }
 
@@ -242,14 +238,6 @@ public class PiglinOverseerEntity extends AbstractPiglinEntity implements IAnima
 
   public void setMainAttackProgress (int tick) {
     this.dataTracker.set(MAIN_ATTACK_PROGRESS, tick);
-  }
-
-  public boolean getMainAttackHasSwung () {
-    return this.getMainAttackHasSwung;
-  }
-
-  public void setMainAttackHasSwung (Boolean hasSwung) {
-    this.getMainAttackHasSwung = hasSwung;
   }
 
   @Override
